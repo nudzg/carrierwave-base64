@@ -24,13 +24,35 @@ module Carrierwave
       #
       # @param model_instance [Object] the model instance object
       # @param options [Hash{Symbol => Object}] the uploader options
+      # @param data [Object] mounted field contents
       # @return [String] File name without extension
-      def file_name(model_instance, options)
-        if options[:file_name].respond_to?(:call)
+      def file_name(model_instance, options, data)
+        if options[:hash_data]
+          File.basename(data['filename'], File.extname(data['filename']))
+        elsif options[:file_name].respond_to?(:call)
           options[:file_name].call(model_instance)
         else
           options[:file_name]
         end.to_s
+      end
+
+      def data_has_base64_in_hash(data)
+        data.is_a?(Hash) &&
+          data.key?('content') &&
+          data['content'].strip.start_with?('data')
+      end
+
+      def data_has_base64(data)
+        (data.is_a?(String) && data.strip.start_with?('data')) ||
+          Carrierwave::Base64::MountingHelper.data_has_base64_in_hash(data)
+      end
+
+      def data_base64_content(data)
+        if data.is_a?(String) && data.strip.start_with?('data')
+          data.strip
+        elsif Carrierwave::Base64::MountingHelper.data_has_base64_in_hash(data)
+          data['content'].strip
+        end
       end
 
       # Defines an attribute writer method on the class with mounted uploader.
@@ -49,13 +71,14 @@ module Carrierwave
 
           send("#{attr}_will_change!") if respond_to?("#{attr}_will_change!")
 
-          return super(data) unless data.is_a?(String) &&
-                                    data.strip.start_with?('data')
-
-          super Carrierwave::Base64::Base64StringIO.new(
-            data.strip,
-            Carrierwave::Base64::MountingHelper.file_name(self, options)
-          )
+          if Carrierwave::Base64::MountingHelper.data_has_base64(data)
+            super Carrierwave::Base64::Base64StringIO.new(
+              Carrierwave::Base64::MountingHelper.data_base64_content(data),
+              Carrierwave::Base64::MountingHelper.file_name(self, options, data)
+            )
+          else
+            super(data)
+          end
         end
       end
     end

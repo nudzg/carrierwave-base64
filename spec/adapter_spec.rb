@@ -15,6 +15,31 @@ RSpec.describe Carrierwave::Base64::Adapter do
       end
     end
 
+    context 'having file name in mounted attribute' do
+      subject do
+        User.mount_base64_uploader(:image, uploader, hash_data: true)
+        User.new
+      end
+
+      before(:each) do
+        subject.image = {
+          'content' => File.read(
+            file_path('fixtures', 'base64_image.fixture')
+          ).strip,
+          'filename' => 'joker.png'
+        }
+      end
+
+      it 'creates a file with provided name' do
+        subject.save!
+
+        expect(
+          subject.image.current_path
+        ).to eq file_path('../uploads', 'joker.png')
+      end
+
+    end
+
     context 'models without file_name option for the uploader' do
       subject do
         User.mount_base64_uploader(:image, uploader)
@@ -26,6 +51,24 @@ RSpec.describe Carrierwave::Base64::Adapter do
           subject.image = File.read(
             file_path('fixtures', 'base64_image.fixture')
           ).strip
+        end
+
+        it 'creates a file' do
+          subject.save!
+
+          expect(
+            subject.image.current_path
+          ).to eq file_path('../uploads', 'image.png')
+        end
+      end
+
+      context 'base64 string in hash' do
+        before(:each) do
+          subject.image = {
+            'content' => File.read(
+              file_path('fixtures', 'base64_image.fixture')
+            ).strip
+          }
         end
 
         it 'creates a file' do
